@@ -3410,7 +3410,7 @@ ConfigDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 /* This may pick the wrong session if the user is logged in twice */
 HANDLE get_token_for_user(LPCTSTR pUsername)
 {
-    DWORD dwProcesses[128], dwProcs;
+    DWORD dwProcesses[4096], dwProcs;
     HANDLE hToken, hFullToken = NULL;
 
     /* no user */
@@ -3419,9 +3419,9 @@ HANDLE get_token_for_user(LPCTSTR pUsername)
 
     /* Go over the list for running processes, and find one which */
     /* has the same user */
-    if (EnumProcesses(dwProcesses, sizeof(DWORD)*128, &dwProcs)) {
+    if (EnumProcesses(dwProcesses, sizeof(DWORD)*4096, &dwProcs)) {
 	DWORD i;
-	for (i=0;(hFullToken == NULL) && (i<min(dwProcs, 128));i++) {
+	for (i=0;(hFullToken == NULL) && (i<min(dwProcs, 4096));i++) {
 	    HANDLE hProc = 
 		OpenProcess(PROCESS_QUERY_INFORMATION|PROCESS_VM_READ, 
 		FALSE, dwProcesses[i]);
