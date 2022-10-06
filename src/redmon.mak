@@ -52,7 +52,7 @@ VISUALC=9
 !if "$(_NMAKE_VER)" == "10.00.30319.01"
 VISUALC=10
 !endif
-!if [cmd /c if "%_NMAKE_VER:~0,6%"=="14.28." exit 1]
+!if [cmd /c if "%_NMAKE_VER:~0,6%"=="14.33." exit 1]
 VISUALC=14
 !endif
 !ifndef VISUALC
@@ -85,8 +85,8 @@ DEVBASE=c:\Program Files\Microsoft Visual Studio 10.0
 !if $(VISUALC) == 14
 # VS_EDITION=Professional
 VS_EDITION=Community
-DEVBASE=C:\Program Files (x86)\Microsoft Visual Studio\2019\$(VS_EDITION)
-DDKVER=10.0.19041.0
+DEVBASE=C:\Program Files\Microsoft Visual Studio\2022\$(VS_EDITION)
+DDKVER=10.0.22621.0
 !endif
 
 
@@ -148,7 +148,7 @@ PLATLIBDIR64=c:\Program Files\Microsoft SDKs\Windows\v7.0A\lib\x64
 !endif
 
 !if $(VISUALC) == 14
-COMPBASE=$(DEVBASE)\VC\Tools\MSVC\14.28.29910
+COMPBASE=$(DEVBASE)\VC\Tools\MSVC\14.33.31629
 RCOMP="$(SDKBINDIR)\rc"
 VFLAGS=/wd4996
 PLATLIBDIR64=$(DDKLIBBASE)\um\x64
