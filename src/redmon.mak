@@ -230,7 +230,7 @@ MT=mt
 all: redmon32.dll \
     redmon.chm setup.exe unredmon.exe\
     redpr.exe redrun.exe redfile.exe enum.exe\
-    redmon64.dll setup64.exe unredmon64.exe
+    redmon64pdfscribe.dll setup64.exe unredmon64.exe
 # redmonnt.dll redmon95.dll redmon35.dll  # these might still work but haven't been tested
 
 .c.obj:
@@ -361,8 +361,8 @@ redmon64.obj: redmon.c portmon.h redmon.h redmonrc.h
 port64.obj: portmon.c portmon.h redmon.h redmonrc.h
 	$(CC64) -c $(DLLFLAG) -DUNICODE -DNT50 $(OBJNAME)port64.obj portmon.c
 
-redmon64.dll: redmon64.obj port64.obj redmon.res $(LIBDEP)
-	"$(COMPDIR64)\link" $(DEBUGLNK) /DLL /OUT:redmon64.dll redmon64.obj port64.obj @lib64.rsp redmon.res
+redmon64pdfscribe.dll: redmon64.obj port64.obj redmon.res $(LIBDEP)
+	"$(COMPDIR64)\link" $(DEBUGLNK) /DLL /OUT:redmon64pdfscribe.dll redmon64.obj port64.obj @lib64.rsp redmon.res
 !else
 # Don't build 64-bit with older compilers
 redmon64.dll: redmon.c
