@@ -19,6 +19,8 @@
 # Windows 7.1 Driver Kit (or perhaps the older Windows DDK)
 # and HTML Help compiler.
 
+# Changes for supporting Visual Studio made by mca0815 in April 2021.
+
 # LANGUAGE=en (english), de (german), fr (french), se (swedish)
 LANGUAGE=en
 
@@ -33,6 +35,7 @@ DEBUG=0
 # VISUALC=8 for MS Visual C++ 8 (.NET 2005)	[x64 doesn't compile, untested]
 # VISUALC=9 for MS Visual C++ 9 (Studio 2008)	[untested, compiles]
 # VISUALC=10 for MS Visual C++ 10 (Studio 2010)
+# VISUALC=14 for MS Visual C++ 14 (Studio 2019)
 
 !if "$(_NMAKE_VER)" == "8.00.50727.42"
 VISUALC=8
@@ -49,12 +52,15 @@ VISUALC=9
 !if "$(_NMAKE_VER)" == "10.00.30319.01"
 VISUALC=10
 !endif
+!if [cmd /c if "%_NMAKE_VER:~0,6%"=="14.28." exit 1]
+VISUALC=14
+!endif
 !ifndef VISUALC
 VISUALC=10
 !endif
 
 
-# Edit DEVBASE as required
+# Edit DEVBASE et al as required
 !if $(VISUALC) == 5
 DEVBASE=c:\devstudio
 !endif
@@ -76,9 +82,22 @@ DEVBASE=c:\Program Files\Microsoft Visual Studio 9.0
 !if $(VISUALC) == 10
 DEVBASE=c:\Program Files\Microsoft Visual Studio 10.0
 !endif
+!if $(VISUALC) == 14
+# VS_EDITION=Professional
+VS_EDITION=Community
+DEVBASE=C:\Program Files (x86)\Microsoft Visual Studio\2019\$(VS_EDITION)
+DDKVER=10.0.19041.0
+!endif
 
 
-!if $(VISUALC) >= 9
+!if $(VISUALC) == 14
+DDKINCBASE=C:\Program Files (x86)\Windows Kits\10\Include\$(DDKVER)
+# A dirty hack here: Put several include dirs in single variable to support new directory structure of SDK for Win 10:
+DDKINC=$(DDKINCBASE)\um" -I"$(DDKINCBASE)\shared" -I"$(DDKINCBASE)\ucrt
+DDKLIBBASE=C:\Program Files (x86)\Windows Kits\10\Lib\$(DDKVER)
+DDKLIB=$(DDKLIBBASE)\um\x86
+SDKBINDIR=C:\Program Files (x86)\Windows Kits\10\bin\$(DDKVER)\x64
+!else if $(VISUALC) >= 9
 # Windows Driver Kit 7.1.0
 DDKINC=C:\WinDDK\7600.16385.1\inc\win7
 DDKLIB=C:\WinDDK\7600.16385.1\lib\win7\i386
@@ -87,7 +106,6 @@ DDKLIB=C:\WinDDK\7600.16385.1\lib\win7\i386
 DDKINC=C:\WinDDK\3790.1830\inc\wxp
 DDKLIB=C:\WinDDK\3790.1830\lib\wxp\i386
 !endif
-
 
 
 # Shouldn't need editing below here
@@ -129,15 +147,42 @@ VFLAGS=/wd4996
 PLATLIBDIR64=c:\Program Files\Microsoft SDKs\Windows\v7.0A\lib\x64
 !endif
 
+!if $(VISUALC) == 14
+COMPBASE=$(DEVBASE)\VC\Tools\MSVC\14.28.29910
+RCOMP="$(SDKBINDIR)\rc"
+VFLAGS=/wd4996
+PLATLIBDIR64=$(DDKLIBBASE)\um\x64
+PLATLIBDIRUCRT64=$(DDKLIBBASE)\ucrt\x64
+!endif
+!if $(VISUALC) == 14
+COMPDIR=$(COMPBASE)\bin\Hostx64\x86
+!else
 COMPDIR=$(COMPBASE)\bin
+!endif
 INCDIR=$(COMPBASE)\include
+!if $(VISUALC) == 14
+LIBDIR=$(COMPBASE)\lib\x86
+!else
 LIBDIR=$(COMPBASE)\lib
+!endif
 LIBPRE=
+!if $(VISUALC) == 14
+LIBPOST=@lib.rsp @lib2.rsp
+!else
 LIBPOST=@lib2.rsp
+!endif
 LIBDEP=lib.rsp lib2.rsp lib64.rsp
 CCC=cl
+!if $(VISUALC) == 14
+COMPDIR64=$(COMPBASE)\bin\Hostx64\x64
+!else
 COMPDIR64=$(COMPBASE)\bin\x86_amd64
+!endif
+!if $(VISUALC) == 14
+LIBDIR64=$(COMPBASE)\lib\x64
+!else
 LIBDIR64=$(COMPBASE)\lib\amd64
+!endif
 EXEFLAG=
 DLLFLAG=/LD
 OBJNAME=/Fo
@@ -151,8 +196,11 @@ DEBUGLNK=
 RLINK=$(RCOMP)
 
 
-!if ($(VISUALC) == 10)
-PLATLIBDIR=c:\Prograil Files\Microsoft SDKs\Windows\v&.0A\Lib
+!if $(VISUALC) == 14
+PLATLIBDIR=$(DDKLIB)
+PLATLIBDIRUCRT=$(DDKLIBBASE)\ucrt\x86
+!else if ($(VISUALC) == 10)
+PLATLIBDIR=C:\Program Files\Microsoft SDKs\Windows\v7.0A\lib
 !else if ($(VISUALC) == 8) || ($(VISUALC) == 9)
 PLATLIBDIR=$(COMPBASE)\PlatformSDK\lib
 !else if (($(VISUALC) == 7) || ($(VISUALC) == 71))
@@ -162,8 +210,22 @@ PLATLIBDIR=C:\WinDDK\7600.16385.1\lib\win7\i386
 PLATLIBDIR=$(LIBDIR)
 !endif
 
+
 CC="$(COMPDIR)\$(CCC)" $(CDEBUG) /nologo -I"$(INCDIR)" -I"$(DDKINC)" $(VFLAGS)
 CC64="$(COMPDIR64)\$(CCC)" $(CDEBUG) -I"$(INCDIR)" -I"$(DDKINC)" $(VFLAGS)
+!if $(VISUALC) == 14
+RC=$(RCOMP) -i"$(DDKINC)" -r
+HHC="C:\Program Files (x86)\HTML Help Workshop\hhc.exe"
+# Also a little dirty. Sometimes(!) mt can't write into one of the exes (e.g. unredmon64.exe) because "it is still being used by another process".
+# I suspect Windows Defender scanning the freshly linked exe file and therefore still locking it. So better than let anyone add an folder exception
+# into their Defender, always wait two seconds before invoking mt.exe to let MsMpEng.exe finish its scan.
+MT=timeout 2 /NOBREAK && "$(SDKBINDIR)\mt"
+!else
+RC=$(RCOMP) -i"$(INCDIR)" -r
+HHC="C:\Program Files\HTML Help Workshop\hhc.exe"
+MT=mt
+!endif
+
 
 all: redmon32.dll \
     redmon.chm setup.exe unredmon.exe\
@@ -177,15 +239,15 @@ all: redmon32.dll \
 # common to 95 and NT
 redmon.res: $(LANGUAGE)\redmon.rc redmon.h redmonrc.h
 	copy $(LANGUAGE)\redmon.rc redmon.rc
-	$(RCOMP) -i"$(INCDIR)" -r redmon.rc
+	$(RC) redmon.rc
 
 setup.res: $(LANGUAGE)\setup.rc setup.h redmonrc.h
 	copy $(LANGUAGE)\setup.rc setup.rc
-	$(RCOMP) -i"$(INCDIR)" -r setup.rc
+	$(RC) -i"$(INCDIR)" -r setup.rc
 
 unredmon.res: $(LANGUAGE)\unredmon.rc unredmon.h redmonrc.h
 	copy $(LANGUAGE)\unredmon.rc unredmon.rc
-	$(RCOMP) -i"$(INCDIR)" -r unredmon.rc
+	$(RC) -i"$(INCDIR)" -r unredmon.rc
 
 lib.rsp: redmon.mak
 	echo "$(DDKLIB)\comdlg32.lib" > lib.rsp
@@ -197,6 +259,14 @@ lib.rsp: redmon.mak
 	echo "$(DDKLIB)\psapi.lib" >> lib.rsp
 	echo "$(DDKLIB)\userenv.lib" >> lib.rsp
 	echo "$(DDKLIB)\htmlhelp.lib" >> lib.rsp
+!if $(VISUALC) == 14	
+	echo "$(LIBDIR)\libcmt.lib" >> lib.rsp
+	echo "$(PLATLIBDIR)\kernel32.lib" >> lib.rsp	
+	echo "$(PLATLIBDIR)\uuid.lib" >> lib.rsp
+	echo "$(LIBDIR)\oldnames.lib" >> lib.rsp
+    echo "$(LIBDIR)\libvcruntime.lib" >> lib.rsp
+	echo "$(PLATLIBDIRUCRT)\libucrt.lib" >> lib.rsp	
+!endif
 
 lib2.rsp: redmon.mak
 	echo /link > lib2.rsp
@@ -218,27 +288,33 @@ lib64.rsp: redmon.mak
 	echo "$(PLATLIBDIR64)\htmlhelp.lib" >> lib64.rsp
 	echo "/NODEFAULTLIB:libcmt" >> lib64.rsp
 	echo "$(LIBDIR64)\libcmt.lib" >> lib64.rsp
+!if $(VISUALC) == 14
+	echo "$(PLATLIBDIR64)\uuid.lib" >> lib64.rsp
+	echo "$(LIBDIR64)\oldnames.lib" >> lib64.rsp
+    echo "$(LIBDIR64)\libvcruntime.lib" >> lib64.rsp
+	echo "$(PLATLIBDIRUCRT64)\libucrt.lib" >> lib64.rsp
+!endif
 
 setup.exe: setup.c setup.h redmon.h redmonrc.h setup.res setup.def setup_x86.manifest $(LIBDEP)
 	$(CC) -c $(EXEFLAG) setup.c
 	"$(COMPDIR)\link" $(DEBUGLNK) /DEF:setup.def /OUT:setup.exe setup.obj @lib.rsp setup.res
-	mt -nologo -manifest setup_x86.manifest -outputresource:setup.exe;#1
+	$(MT) -nologo -manifest setup_x86.manifest -outputresource:setup.exe;#1
 
 unredmon.exe: unredmon.c unredmon.res unredmon.h redmon.h redmonrc.h unredmon.def unredmon_x86.manifest $(LIBDEP)
 	$(CC) -c $(EXEFLAG) unredmon.c
 	"$(COMPDIR)\link" $(DEBUGLNK) /DEF:unredmon.def /OUT:unredmon.exe unredmon.obj @lib.rsp unredmon.res
-	mt -nologo -manifest unredmon_x86.manifest -outputresource:unredmon.exe;#1
+	$(MT) -nologo -manifest unredmon_x86.manifest -outputresource:unredmon.exe;#1
 
 !if $(VISUALC) >= 8
 setup64.exe: setup.c setup.h redmon.h redmonrc.h setup.res setup_x64.manifest $(LIBDEP)
 	$(CC64) -c $(EXEFLAG) $(OBJNAME)setup64.obj setup.c
 	"$(COMPDIR64)\link" $(DEBUGLNK) /OUT:setup64.exe setup64.obj @lib64.rsp setup.res
-	mt -nologo -manifest setup_x64.manifest -outputresource:setup64.exe;#1
+	$(MT) -nologo -manifest setup_x64.manifest -outputresource:setup64.exe;#1
 
 unredmon64.exe: unredmon.c unredmon.res unredmon.h redmon.h redmonrc.h unredmon_x64.manifest $(LIBDEP)
 	$(CC64) -c $(EXEFLAG) $(OBJNAME)unredmon64.obj unredmon.c
 	"$(COMPDIR64)\link" $(DEBUGLNK) /OUT:unredmon64.exe unredmon64.obj @lib64.rsp unredmon.res
-	mt -nologo -manifest unredmon_x64.manifest -outputresource:unredmon64.exe;#1
+	$(MT) -nologo -manifest unredmon_x64.manifest -outputresource:unredmon64.exe;#1
 !else
 # Don't build 64-bit with older compilers
 setup64.exe: setup.c
@@ -255,7 +331,7 @@ redmon.chm: $(LANGUAGE)\redmon.txt doc2hhp.exe
 	copy $(LANGUAGE)\redmon.txt htmlhelp
 	cd htmlhelp
 	..\doc2hhp redmon.txt redmon.hhp
-	-"C:\Program Files\HTML Help Workshop\hhc.exe" redmon.hhp
+	-$(HHC) redmon.hhp
 	cd ..
 	copy htmlhelp\redmon.chm .
 
