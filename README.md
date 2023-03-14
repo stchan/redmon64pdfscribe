@@ -14,4 +14,4 @@ Redmon64pdfscribe's license is GPLv3.
 ## Notes
 * Redmon home page is [here](http://www.ghostgum.com.au/software/redmon.htm).
 * There's a Github mirror of the original source [here](https://github.com/ARLM-Keller/redmon).
-* HTML help (installer is in the misc subfolder) must be installed if you want to build all with the make file.
+* HTML help compiler (installer is in the misc subfolder) must be installed if you want to build all with the make file.
